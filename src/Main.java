@@ -1,27 +1,31 @@
 import javafx.application.Application;
-import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
-import java.util.Optional;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONException;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 public class Main extends Application {
 
     private Controller controller;
     private TextField searchField;
-    private Button searchButton;
-    private ListView<String> listView;
-    private ProgressIndicator progressIndicator;
+    private Button searchButton, submitReviewButton;
+    private ListView<GasStation> listView;
+    private List<GasStation> gasStations = new ArrayList<>();
 
     public static void main(String[] args) {
         launch(args);
@@ -31,12 +35,10 @@ public class Main extends Application {
     public void start(Stage primaryStage) {
         controller = new Controller();
 
-        // Root layout
         BorderPane rootLayout = new BorderPane();
         rootLayout.setPadding(new Insets(20));
         rootLayout.setStyle("-fx-background-color: #f0f4f7;");
 
-        // Personal and course information
         Text personalInfo = new Text("Marious Yousif\nOakland University\nCSI 2300");
         personalInfo.setFont(Font.font("Arial", 12));
         HBox topSection = new HBox();
@@ -44,7 +46,6 @@ public class Main extends Application {
         topSection.getChildren().add(personalInfo);
         rootLayout.setTop(topSection);
 
-        // Center section
         VBox centerSection = new VBox(10);
         centerSection.setAlignment(Pos.CENTER);
 
@@ -61,27 +62,60 @@ public class Main extends Application {
         searchButton.setFont(Font.font("Arial", 14));
         searchButton.setStyle("-fx-background-color: #5cb85c; -fx-text-fill: white;");
 
-        progressIndicator = new ProgressIndicator();
-        progressIndicator.setVisible(false); // Hidden by default
+        submitReviewButton = new Button("Submit Review");
+        submitReviewButton.setFont(Font.font("Arial", 14));
+        submitReviewButton.setDisable(true);  // Disabled by default
 
-        listView = new ListView<>();
+        listView = new ListView<>(FXCollections.observableArrayList(gasStations));
         listView.setPrefSize(600, 400);
+        listView.setCellFactory(param -> new ListCell<GasStation>() {
+            @Override
+            protected void updateItem(GasStation gasStation, boolean empty) {
+                super.updateItem(gasStation, empty);
+                if (empty || gasStation == null) {
+                    setText(null);
+                } else {
+                    setText(gasStation.getName() + " - " + gasStation.getAddress());
+                }
+            }
+        });
 
-        centerSection.getChildren().addAll(programTitle, searchField, searchButton, progressIndicator, listView);
+        // Selection listener to enable the "Submit Review" button when a gas station is selected
+        listView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            submitReviewButton.setDisable(newVal == null);
+        });
+
+        listView.setOnMouseClicked(event -> {
+            if(event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
+                GasStation selectedGasStation = listView.getSelectionModel().getSelectedItem();
+                if(selectedGasStation != null) {
+                    showReviews(selectedGasStation);
+                }
+            }
+        });
+
+        HBox buttonSection = new HBox(10, searchButton, submitReviewButton);
+        buttonSection.setAlignment(Pos.CENTER);
+
+        centerSection.getChildren().addAll(programTitle, searchField, buttonSection, listView);
         rootLayout.setCenter(centerSection);
 
-        // Event handlers
         searchButton.setOnAction(event -> handleSearch());
+
+        submitReviewButton.setOnAction(event -> {
+            GasStation selectedGasStation = listView.getSelectionModel().getSelectedItem();
+            if (selectedGasStation != null) {
+                showReviewDialog(selectedGasStation);
+            }
+        });
 
         Scene scene = new Scene(rootLayout, 800, 600);
         primaryStage.setScene(scene);
         primaryStage.show();
     }
-
     private void handleSearch() {
         String zipCode = searchField.getText();
         searchButton.setDisable(true);
-        progressIndicator.setVisible(true); // Show the progress indicator
 
         Task<JSONArray> fetchStationsTask = new Task<JSONArray>() {
             @Override
@@ -94,7 +128,6 @@ public class Main extends Application {
                 super.succeeded();
                 updateListView(getValue());
                 searchButton.setDisable(false);
-                progressIndicator.setVisible(false); // Hide the progress indicator
             }
 
             @Override
@@ -104,81 +137,74 @@ public class Main extends Application {
                 Alert errorAlert = new Alert(Alert.AlertType.ERROR, "Failed to fetch gas stations.");
                 errorAlert.showAndWait();
                 searchButton.setDisable(false);
-                progressIndicator.setVisible(false); // Hide the progress indicator
             }
         };
         new Thread(fetchStationsTask).start();
     }
 
     private void updateListView(JSONArray stations) {
-        listView.getItems().clear();
+        gasStations.clear();
         for (int i = 0; i < stations.length(); i++) {
             try {
                 JSONObject station = stations.getJSONObject(i);
                 String stationName = station.optString("name", "Unknown Station");
                 String stationAddress = station.optString("formatted_address", "No address available");
-                String listItem = stationName + " - " + stationAddress;
-                listView.getItems().add(listItem);
+                gasStations.add(new GasStation(stationName, stationAddress));
             } catch (JSONException e) {
                 e.printStackTrace();
             }
         }
+        listView.setItems(FXCollections.observableArrayList(gasStations));
     }
-    // In the Main class:
 
-private void showReviewDialog(GasStation gasStation) {
-    // Create the custom dialog.
-    Dialog<Review> dialog = new Dialog<>();
-    dialog.setTitle("Submit Review");
+    private void showReviewDialog(GasStation gasStation) {
+        Dialog<Review> dialog = new Dialog<>();
+        dialog.setTitle("Submit Review");
 
-    // Set the button types.
-    ButtonType submitButtonType = new ButtonType("Submit", ButtonBar.ButtonData.OK_DONE);
-    dialog.getDialogPane().getButtonTypes().addAll(submitButtonType, ButtonType.CANCEL);
+        ButtonType submitButtonType = new ButtonType("Submit", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(submitButtonType, ButtonType.CANCEL);
 
-    // Create the username and rating fields.
-    TextField usernameField = new TextField();
-    usernameField.setPromptText("Username");
-    Spinner<Double> ratingSpinner = new Spinner<>(0.0, 5.0, 5.0, 0.5);
-    TextArea commentArea = new TextArea();
-    commentArea.setPromptText("Your review");
+        TextField nameField = new TextField();
+        nameField.setPromptText("Name");
+        Spinner<Double> ratingSpinner = new Spinner<>(1.0, 5.0, 5.0, 0.5);
+        TextArea commentArea = new TextArea();
+        commentArea.setPromptText("Your review");
 
-    // Layout the dialog components.
-    GridPane grid = new GridPane();
-    grid.setHgap(10);
-    grid.setVgap(10);
-    grid.add(new Label("Username:"), 0, 0);
-    grid.add(usernameField, 1, 0);
-    grid.add(new Label("Rating:"), 0, 1);
-    grid.add(ratingSpinner, 1, 1);
-    grid.add(new Label("Comment:"), 0, 2);
-    grid.add(commentArea, 1, 2);
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.add(new Label("Name:"), 0, 0);
+        grid.add(nameField, 1, 0);
+        grid.add(new Label("Rating:"), 0, 1);
+        grid.add(ratingSpinner, 1, 1);
+        grid.add(new Label("Comment:"), 0, 2);
+        grid.add(commentArea, 1, 2);
 
-    dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().setContent(grid);
 
-    // Request focus on the username field by default.
-    Platform.runLater(() -> usernameField.requestFocus());
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == submitButtonType) {
+                return new Review(nameField.getText(), ratingSpinner.getValue(), commentArea.getText());
+            }
+            return null;
+        });
 
-    // Convert the result to a Review when the submit button is clicked.
-    dialog.setResultConverter(dialogButton -> {
-        if (dialogButton == submitButtonType) {
-            return new Review(usernameField.getText(), ratingSpinner.getValue(), commentArea.getText());
-        }
-        return null;
-    });
+        Optional<Review> result = dialog.showAndWait();
 
-    Optional<Review> result = dialog.showAndWait();
-
-    result.ifPresent(review -> {
-        gasStation.addReview(review);
-        updateListViewWithReviews(gasStation);
-    });
-}
-
-private void updateListViewWithReviews(GasStation gasStation) {
-    listView.getItems().clear();
-    for (Review review : gasStation.getReviews()) {
-        listView.getItems().add(review.getUsername() + " (" + review.getRating() + "): " + review.getComment());
+        result.ifPresent(review -> {
+            gasStation.addReview(review);
+        });
     }
-}
 
+    private void showReviews(GasStation gasStation) {
+        String reviewsText = gasStation.getReviews().stream()
+                .map(review -> review.getName() + " (" + review.getRating() + "):\n" + review.getComment() + "\n")
+                .reduce("", String::concat);
+
+        Alert reviewsAlert = new Alert(Alert.AlertType.INFORMATION);
+        reviewsAlert.setTitle("Reviews for " + gasStation.getName());
+        reviewsAlert.setHeaderText("User Reviews");
+        reviewsAlert.setContentText(reviewsText.isEmpty() ? "No reviews yet." : reviewsText);
+        reviewsAlert.showAndWait();
+    }
 }

@@ -1,17 +1,16 @@
 public class Review {
-    private String username;
+    private String name;
     private double rating;
     private String comment;
 
-    public Review(String username, double rating, String comment) {
-        this.username = username;
+    public Review(String name, double rating, String comment) {
+        this.name = name;
         this.rating = rating;
         this.comment = comment;
     }
 
-    // Getters and Setters
-    public String getUsername() {
-        return username;
+    public String getName() {
+        return name;
     }
 
     public double getRating() {
