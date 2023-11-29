@@ -7,8 +7,7 @@ import org.json.JSONObject;
 
 public class ApiHandler {
 
-    private final String apiKey = "AIzaSyCxX4yvtl3C9KNyCHR-XNAHKD2ezAT6WnU"; // Replace with your actual API key
-
+    private final String apiKey = "AIzaSyCxX4yvtl3C9KNyCHR-XNAHKD2ezAT6WnU"; 
     public JSONArray getGasStations(String zipCode) {
         try {
             HttpClient client = HttpClient.newHttpClient();
