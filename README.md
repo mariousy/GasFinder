@@ -27,3 +27,7 @@ To run the application, execute the `main` method in the `Main` class. The user 
 - Enter a zip code into the search field and click 'Search' to find gas stations.
 - Select a gas station from the list and click 'Submit Review' to add a review.
 - Double-click on a gas station to view reviews.
+
+## Demo Video
+
+https://youtu.be/nEAIwGIUIvc?si=1veA06dlzlPFJ-bW
